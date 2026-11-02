@@ -1,0 +1,29 @@
+# Environment: real values live in .env, which must never be committed.
+.env
+.env.*
+!.env.example
+
+# Java / Maven
+target/
+.mvn/wrapper/maven-wrapper.jar
+
+# Node / Vite
+node_modules/
+dist/
+dist-ssr/
+*.local
+*.tsbuildinfo
+npm-debug.log*
+
+# Logs
+logs/
+*.log
+
+# Editors and OS
+.idea/
+*.iml
+*.iws
+.vscode/*
+!.vscode/extensions.json
+*.swp
+.DS_Store

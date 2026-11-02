@@ -1,0 +1,41 @@
+# All settings come from environment variables with local-development defaults.
+# For local runs, the repository-root .env file (copied from .env.example) is
+# imported too; real environment variables always take precedence over it.
+spring:
+  application:
+    name: queryforge-api
+  config:
+    # Resolved against the working directory, which is apps/api for ./mvnw spring-boot:run.
+    import: optional:file:../../.env[.properties]
+  datasource:
+    url: jdbc:postgresql://${POSTGRES_HOST:localhost}:${POSTGRES_PORT:5432}/${POSTGRES_DB:queryforge}
+    username: ${POSTGRES_USER:queryforge}
+    password: ${POSTGRES_PASSWORD:}
+    hikari:
+      # Milliseconds. Fail fast when PostgreSQL is unreachable so health checks
+      # report DOWN within seconds instead of after Hikari's 30 s default.
+      connection-timeout: 5000
+
+server:
+  port: ${API_PORT:8080}
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health
+      cors:
+        allowed-origins: ${API_CORS_ALLOWED_ORIGINS:http://localhost:5173}
+        allowed-methods: GET
+  endpoint:
+    health:
+      # Report each component's status (db, diskSpace, ...) but never its
+      # details, which include database product and connection information.
+      show-components: always
+      show-details: never
+      probes:
+        enabled: true
+      group:
+        # Liveness stays independent of PostgreSQL; readiness requires it.
+        readiness:
+          include: readinessState,db

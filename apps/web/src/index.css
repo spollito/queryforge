@@ -1,0 +1,52 @@
+@import "tailwindcss";
+
+@theme {
+  --font-sans: "IBM Plex Sans", ui-sans-serif, system-ui, sans-serif;
+  --font-mono: "IBM Plex Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
+
+  /* Steel neutrals with one molten accent, reserved for the mark and "next" work. */
+  --color-page: #edf0f3;
+  --color-surface: #f8f9fb;
+  --color-ink: #18202b;
+  --color-ink-muted: #556070;
+  --color-rule: #c9d0d9;
+  --color-molten: #f2a900;
+  --color-on-molten: #18202b;
+  --color-ok: #1d7a4c;
+  --color-down: #b42318;
+
+  --animate-plan-row: plan-row-in 280ms ease-out both;
+
+  @keyframes plan-row-in {
+    from {
+      opacity: 0;
+      transform: translateX(-4px);
+    }
+    to {
+      opacity: 1;
+      transform: none;
+    }
+  }
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --color-page: #171b21;
+    --color-surface: #1e242c;
+    --color-ink: #e3e8ee;
+    --color-ink-muted: #9aa4b2;
+    --color-rule: #333c48;
+    --color-ok: #4cc38a;
+    --color-down: #f97066;
+  }
+}
+
+@layer base {
+  html {
+    color-scheme: light dark;
+  }
+
+  body {
+    @apply bg-page font-sans text-ink antialiased;
+  }
+}

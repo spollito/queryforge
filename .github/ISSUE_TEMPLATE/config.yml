@@ -1,0 +1,5 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Roadmap
+    url: https://github.com/spollito/queryforge/blob/main/docs/roadmap.md
+    about: Check whether the work is already planned before opening a request.

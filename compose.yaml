@@ -1,0 +1,28 @@
+# Local development services. The API and web app run directly on the host;
+# see README.md. Values come from .env (copy .env.example first).
+name: queryforge
+
+services:
+  postgres:
+    # Keep in step with TestcontainersConfiguration in apps/api.
+    image: postgres:18-alpine
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-queryforge}
+      POSTGRES_USER: ${POSTGRES_USER:-queryforge}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD is not set. Copy .env.example to .env first.}
+    ports:
+      # Loopback only, so the database is not reachable from the local network.
+      - "127.0.0.1:${POSTGRES_PORT:-5432}:5432"
+    volumes:
+      # PostgreSQL 18+ images store data under /var/lib/postgresql/<major>/docker,
+      # so the volume mounts the parent directory rather than .../data.
+      - postgres-data:/var/lib/postgresql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U \"$${POSTGRES_USER}\" -d \"$${POSTGRES_DB}\""]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+      start_period: 10s
+
+volumes:
+  postgres-data:
