@@ -19,11 +19,15 @@ export interface ApiClientOptions {
 
 export interface RequestOptions {
   signal?: AbortSignal
+  /** Overrides the client's default timeout for this request. */
+  timeoutMs?: number
 }
 
 export interface ApiClient {
   readonly baseUrl: string
   get<T>(path: string, options?: RequestOptions): Promise<T>
+  /** Sends `body` as JSON. */
+  post<T>(path: string, body: unknown, options?: RequestOptions): Promise<T>
 }
 
 const DEFAULT_TIMEOUT_MS = 10_000
@@ -37,13 +41,22 @@ export function createApiClient({
   timeoutMs = DEFAULT_TIMEOUT_MS,
   fetch: fetchImpl = globalThis.fetch.bind(globalThis),
 }: ApiClientOptions): ApiClient {
-  async function request<T>(method: string, path: string, options: RequestOptions = {}): Promise<T> {
-    const signals = [AbortSignal.timeout(timeoutMs)]
+  async function request<T>(
+    method: string,
+    path: string,
+    options: RequestOptions = {},
+    requestBody?: unknown,
+  ): Promise<T> {
+    const signals = [AbortSignal.timeout(options.timeoutMs ?? timeoutMs)]
     if (options.signal) signals.push(options.signal)
+
+    const headers: Record<string, string> = { Accept: 'application/json' }
+    if (requestBody !== undefined) headers['Content-Type'] = 'application/json'
 
     const response = await fetchImpl(joinUrl(baseUrl, path), {
       method,
-      headers: { Accept: 'application/json' },
+      headers,
+      body: requestBody === undefined ? undefined : JSON.stringify(requestBody),
       signal: AbortSignal.any(signals),
     })
     const body = await readBody(response)
@@ -57,6 +70,7 @@ export function createApiClient({
   return {
     baseUrl,
     get: (path, options) => request('GET', path, options),
+    post: (path, body, options) => request('POST', path, options, body),
   }
 }
 

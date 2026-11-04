@@ -19,13 +19,26 @@ spring:
 server:
   port: ${API_PORT:8080}
 
+queryforge:
+  cors:
+    # Comma-separated. Applies to /api/** and the Actuator endpoints.
+    allowed-origins: ${API_CORS_ALLOWED_ORIGINS:http://localhost:5173}
+  # The database QueryForge analyzes. Defaults point at the sample-db Compose service.
+  target:
+    url: ${TARGET_DB_URL:jdbc:postgresql://localhost:5433/sample}
+    username: ${TARGET_DB_USER:queryforge_reader}
+    password: ${TARGET_DB_PASSWORD:}
+    statement-timeout: ${TARGET_DB_STATEMENT_TIMEOUT:10s}
+    # Session time zone for analysis, so timestamp literals mean the same thing wherever the API runs.
+    time-zone: ${TARGET_DB_TIME_ZONE:UTC}
+
 management:
   endpoints:
     web:
       exposure:
         include: health
       cors:
-        allowed-origins: ${API_CORS_ALLOWED_ORIGINS:http://localhost:5173}
+        allowed-origins: ${queryforge.cors.allowed-origins}
         allowed-methods: GET
   endpoint:
     health:
