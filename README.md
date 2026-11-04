@@ -4,7 +4,7 @@
 
 QueryForge is a SQL query optimization engine for PostgreSQL. It is being built to analyze execution plans, find performance bottlenecks, generate optimized rewrites, verify that each rewrite is semantically equivalent to the original, and benchmark the result.
 
-> **Status: Phase 0 (foundation) complete.** The repository has a working API, web client, local database, tests, and CI. None of the optimization capabilities below are implemented yet; see [Current status](#current-status).
+> **Status: Phase 1 (query analysis) in progress.** QueryForge analyzes execution plans and reports bottlenecks with a suggested fix. Rewriting, equivalence checking, learned ranking, and benchmarking are not built yet; see [Current status](#current-status).
 
 ## Why QueryForge
 
@@ -16,13 +16,31 @@ Asking a language model to "make this query faster" is easy. Knowing whether the
 4. **Prove or test equivalence.** Use an SMT solver (Z3) for a supported SQL subset, and differential testing elsewhere.
 5. **Rank and measure.** Predict performance with a learned model, then benchmark the top candidates against the original.
 
+## What works today
+
+Submit a `SELECT` (in the web workbench or with `POST /api/v1/analyses`) and QueryForge:
+
+1. **Checks it is a single read-only query** by parsing it with Apache Calcite, before anything reaches the database.
+2. **Captures the plan** on the target database with `EXPLAIN (FORMAT JSON)`, or with `EXPLAIN (ANALYZE, BUFFERS)` if you ask it to run the query. Either way it runs in a read-only transaction with a statement timeout, as a read-only role, and is rolled back.
+3. **Runs bottleneck detectors** over the plan:
+
+   | Finding | Needs the query to run | Suggested fix |
+   | --- | --- | --- |
+   | Sequential scan that keeps a small fraction of a large table | No | Index on the filtered columns (equality first, then range) |
+   | Sequential scan repeated per outer row (nested loop inner side, correlated subquery) | No | Index on the correlated column, or a join rewrite |
+   | Row estimate off by 10× or more, reported where it originates | Yes | Extended statistics for correlated filter columns, or `ANALYZE` |
+   | Sort that spilled to disk | Yes | `work_mem` sized from the spill, or an index on the sort key |
+   | Hash join or hash aggregate processed in batches on disk | Yes | More hash memory, or a smaller hash input |
+
+4. **Shows the plan** as an EXPLAIN-style tree with each node's own share of total time (or estimated cost), so the hot spot stands out.
+
+Suggestions are starting points to measure, not guarantees. QueryForge does not apply them.
+
 ## Proposed capabilities
 
 These are planned, not built. The [roadmap](docs/roadmap.md) tracks them.
 
-- Connection management for target PostgreSQL databases, with read-only access and statement timeouts
-- SQL parsing and plan analysis with Apache Calcite and `EXPLAIN (FORMAT JSON)`
-- Bottleneck detection over execution plans
+- Connection management for any number of target databases, with credentials stored encrypted
 - Rule-based and LLM-guided query rewriting with an evaluated prompt set
 - Semantic equivalence checking with Z3 for a defined SQL subset
 - Learned performance prediction (XGBoost) for ranking candidate rewrites
@@ -38,15 +56,19 @@ These are planned, not built. The [roadmap](docs/roadmap.md) tracks them.
 | PostgreSQL 18 via Docker Compose | Done |
 | Integration tests against real PostgreSQL (Testcontainers), web unit tests | Done |
 | GitHub Actions CI | Done |
-| Query analysis, rewriting, verification, ML, benchmarking | Planned (Phases 1–3) |
+| Sample target database with a reproducible e-commerce dataset | Done (Phase 1) |
+| Read-only query gate (Calcite), EXPLAIN capture, plan parsing | Done (Phase 1) |
+| Bottleneck detectors (5) and web workbench | Done (Phase 1) |
+| Analysis history, multiple targets, rewrite rules, benchmarking | Next (Phase 1) |
+| LLM rewriting, equivalence verification, ML ranking | Planned (Phases 2–3) |
 
 ## Technology stack
 
 | Layer | In use now | Planned |
 | --- | --- | --- |
 | Web | React 19, TypeScript 6, Vite 8, Tailwind CSS 4, Vitest, ESLint | SQL editor, plan visualization |
-| API | Java 21, Spring Boot 4.1 (Web MVC, Actuator, JDBC), Maven Wrapper | Apache Calcite, Flyway, Z3 |
-| Database | PostgreSQL 18 | |
+| API | Java 21, Spring Boot 4.1 (Web MVC, Actuator, JDBC, Validation), Apache Calcite 1.42, Maven Wrapper | Flyway, Z3 |
+| Database | PostgreSQL 18 (QueryForge's own database and a sample target) | |
 | ML service | | Python, FastAPI, XGBoost, scikit-learn, LLM API |
 | Infrastructure | Docker Compose, GitHub Actions | AWS |
 
@@ -60,12 +82,14 @@ queryforge/
 ├── docs/
 │   ├── architecture.md System design and architectural decisions
 │   └── roadmap.md      Phased development plan
+├── infrastructure/
+│   └── sample-db/      Schema, data generator, and read-only role for the sample target
 ├── .github/            CI workflow and issue templates
-├── compose.yaml        Local PostgreSQL
+├── compose.yaml        Local PostgreSQL: QueryForge's database and the sample target
 └── .env.example        Template for local configuration
 ```
 
-`services/` (Python ML service) and `infrastructure/` (deployment configuration) will be added in the phases that need them.
+`services/` (Python ML service) will be added in the phase that needs it.
 
 ## Local development
 
@@ -83,25 +107,28 @@ If several JDKs are installed on macOS, select 21 with `export JAVA_HOME=$(/usr/
 cp .env.example .env
 ```
 
-Edit `.env` and set `POSTGRES_PASSWORD` to a value of your own. Docker Compose, the API, and the web app all read this one file, which git ignores.
+Edit `.env` and set `POSTGRES_PASSWORD` and `TARGET_DB_PASSWORD` to values of your own. Docker Compose, the API, and the web app all read this one file, which git ignores.
 
-### 2. Start PostgreSQL
+### 2. Start the databases
+
+Compose runs two PostgreSQL servers: `postgres` is QueryForge's own database, and `sample-db` is a target database to analyze, seeded with a synthetic e-commerce dataset (500,000 orders at the default scale). The first start of `sample-db` generates the data, which takes about a minute.
 
 ```bash
-docker compose up -d --wait     # start and wait until healthy
+docker compose up -d --wait     # start both and wait until healthy
 docker compose ps               # check status
-docker compose logs -f postgres # follow logs
+docker compose logs -f sample-db
 docker compose stop             # stop, keeping data
-docker compose down             # remove the container, keeping data
-docker compose down -v          # remove the container AND delete all data
+docker compose down             # remove the containers, keeping data
+docker compose down -v          # remove the containers AND delete all data (regenerates the sample on next start)
 ```
 
-The database listens on `127.0.0.1:5432` only, and data persists in the `queryforge_postgres-data` volume.
+Both listen on loopback only (`127.0.0.1:5432` and `127.0.0.1:5433`), and data persists in named volumes. The sample schema leaves some indexes out on purpose; see [`infrastructure/sample-db/sql/schema.sql`](infrastructure/sample-db/sql/schema.sql).
 
 Open a `psql` shell with:
 
 ```bash
 docker compose exec postgres psql -U queryforge -d queryforge
+docker compose exec sample-db psql -U sample_owner -d sample
 ```
 
 ### 3. Run the API
@@ -121,6 +148,16 @@ curl http://localhost:8080/actuator/health/readiness  # ready for traffic (requi
 
 The API starts even when PostgreSQL is down. Health then reports `DOWN` with HTTP 503, and liveness stays `UP`.
 
+Analyze a query:
+
+```bash
+curl -s -X POST http://localhost:8080/api/v1/analyses \
+  -H 'Content-Type: application/json' \
+  -d '{"sql": "SELECT id FROM orders WHERE customer_id = 42", "mode": "estimate"}'
+```
+
+`mode` is `estimate` (plan only, the default) or `execute` (runs the query with EXPLAIN ANALYZE). Errors are [RFC 9457](https://www.rfc-editor.org/rfc/rfc9457) problem details with a stable `code`: `invalid-request` (400), `unsupported-query` and `query-error` (422, with the error position), `target-unavailable` (503), and `statement-timeout` (504).
+
 ### 4. Run the web app
 
 ```bash
@@ -129,7 +166,7 @@ npm install
 npm run dev
 ```
 
-Open <http://localhost:5173>. The page shows live API and database status.
+Open <http://localhost:5173>. Pick a sample query or paste your own, then choose whether to run it.
 
 ### Configuration reference
 
@@ -142,6 +179,13 @@ All settings are environment variables. Real environment variables override valu
 | `POSTGRES_PASSWORD` | *(none)* | Compose, API | Database password; Compose refuses to start without it |
 | `POSTGRES_HOST` | `localhost` | API | Database host |
 | `POSTGRES_PORT` | `5432` | Compose, API | Host port for PostgreSQL |
+| `SAMPLE_DB_PORT` | `5433` | Compose | Host port for the sample target database |
+| `SAMPLE_SCALE` | `1` | Compose | Sample dataset size multiplier (1 = 500,000 orders); applies when the volume is first created |
+| `TARGET_DB_URL` | `jdbc:postgresql://localhost:5433/sample` | API | JDBC URL of the database to analyze |
+| `TARGET_DB_USER` | `queryforge_reader` | API | Role for analysis; should be read-only |
+| `TARGET_DB_PASSWORD` | *(none)* | Compose, API | Password for that role; Compose creates the sample role with it |
+| `TARGET_DB_STATEMENT_TIMEOUT` | `10s` | API | Longest a single EXPLAIN or EXPLAIN ANALYZE may run |
+| `TARGET_DB_TIME_ZONE` | `UTC` | API | Session time zone for analysis, so timestamp literals do not depend on the API host |
 | `API_PORT` | `8080` | API | HTTP port |
 | `API_CORS_ALLOWED_ORIGINS` | `http://localhost:5173` | API | Comma-separated browser origins allowed to call the API |
 | `VITE_API_BASE_URL` | `http://localhost:8080` | Web | API base URL, embedded at build time |
@@ -167,7 +211,7 @@ CI runs the same commands on every push to `main` and on every pull request. Any
 | Phase | Focus |
 | --- | --- |
 | 0. Foundation | Repository, scaffolding, local database, CI, docs **(done)** |
-| 1. Query analysis | Target connections, Calcite parsing, plan analysis, bottleneck detection, first rewrite rules, benchmarking |
+| 1. Query analysis | Target connections, Calcite parsing, plan analysis, bottleneck detection, first rewrite rules, benchmarking **(in progress)** |
 | 2. AI and automated reasoning | LLM-guided rewriting, prompt evaluation, Z3 equivalence checking, correctness testing |
 | 3. Machine learning | Benchmark datasets, plan features, XGBoost performance prediction, candidate ranking |
 | 4. Production readiness | Observability, security hardening, performance, AWS deployment |

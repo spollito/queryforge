@@ -18,11 +18,38 @@ services:
       # so the volume mounts the parent directory rather than .../data.
       - postgres-data:/var/lib/postgresql
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U \"$${POSTGRES_USER}\" -d \"$${POSTGRES_DB}\""]
+      # TCP, not the Unix socket: during first-start initialization the server
+      # listens on the socket only, so this stays unhealthy until init finishes.
+      test: ["CMD-SHELL", "pg_isready -h 127.0.0.1 -U \"$${POSTGRES_USER}\" -d \"$${POSTGRES_DB}\""]
       interval: 5s
       timeout: 5s
       retries: 10
       start_period: 10s
 
+  # Sample target database for QueryForge to analyze. It is a separate server
+  # because target databases belong to users, not to QueryForge. The init
+  # scripts run only when the volume is empty; `docker compose down -v` resets it.
+  sample-db:
+    image: postgres:18-alpine
+    environment:
+      POSTGRES_DB: sample
+      POSTGRES_USER: sample_owner
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD is not set. Copy .env.example to .env first.}
+      SAMPLE_READER_PASSWORD: ${TARGET_DB_PASSWORD:?TARGET_DB_PASSWORD is not set. Copy .env.example to .env first.}
+      SAMPLE_SCALE: ${SAMPLE_SCALE:-1}
+    ports:
+      - "127.0.0.1:${SAMPLE_DB_PORT:-5433}:5432"
+    volumes:
+      - sample-data:/var/lib/postgresql
+      - ./infrastructure/sample-db:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -h 127.0.0.1 -U \"$${POSTGRES_USER}\" -d \"$${POSTGRES_DB}\""]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+      # First start generates the dataset before the server accepts connections.
+      start_period: 120s
+
 volumes:
   postgres-data:
+  sample-data:

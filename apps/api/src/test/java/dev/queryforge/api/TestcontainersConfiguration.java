@@ -11,9 +11,9 @@ import org.testcontainers.utility.DockerImageName;
  * with the one in compose.yaml so tests exercise the same major version.
  */
 @TestConfiguration(proxyBeanMethods = false)
-class TestcontainersConfiguration {
+public class TestcontainersConfiguration {
 
-	static final DockerImageName POSTGRES_IMAGE = DockerImageName.parse("postgres:18-alpine");
+	public static final DockerImageName POSTGRES_IMAGE = DockerImageName.parse("postgres:18-alpine");
 
 	@Bean
 	@ServiceConnection

@@ -20,19 +20,22 @@ Goal: a clean, working repository that later phases build on without rework.
 
 **Exit criteria (met):** the API starts and reports health, the web app builds and shows live status, PostgreSQL runs through Compose, and all checks pass locally and in CI.
 
-## Phase 1: Query Analysis (Next)
+## Phase 1: Query Analysis (In progress)
 
 Goal: given a SQL query and a target database, explain why it is slow and suggest deterministic improvements, with measured evidence.
 
+- [x] **Reference dataset:** a reproducible synthetic e-commerce schema and data generator (`infrastructure/sample-db`), run by Docker Compose and by integration tests
+- [x] **Target connection (single):** one configured target database; read-only role, read-only rolled-back transactions, per-transaction statement timeout and time zone; credentials never exposed
+- [x] **SQL parsing:** Apache Calcite (Babel) parsing of PostgreSQL-dialect queries as a gate admitting exactly one read-only query, with positioned errors outside the supported grammar
+- [x] **Execution-plan analysis:** `EXPLAIN (FORMAT JSON)` parsed into a typed plan tree; opt-in `EXPLAIN (ANALYZE, BUFFERS)`; correct row accounting for loops and parallel plans; each node's own share of time or cost
+- [x] **Bottleneck detection:** selective sequential scans, repeated sequential scans, row-estimate errors (reported at their origin), sort spills, and hash spills, each pointing at its plan node with a suggested fix
+- [x] **Web:** SQL workbench with sample queries, findings, and an EXPLAIN-style plan tree
 - [ ] **Persistence foundation:** Flyway migrations and the first QueryForge schema (analysis runs, captured plans, findings)
-- [ ] **Target connection management:** register target PostgreSQL databases; enforce read-only sessions, `statement_timeout`, and connection limits; never expose credentials through the API
-- [ ] **SQL parsing:** Apache Calcite parsing of PostgreSQL-dialect `SELECT` statements into relational algebra; a documented supported subset with clear errors outside it
-- [ ] **Execution-plan analysis:** capture `EXPLAIN (FORMAT JSON)` and parse it into a typed plan tree; opt-in `EXPLAIN (ANALYZE, BUFFERS)` inside a rolled-back transaction
-- [ ] **Bottleneck detection:** rules for row-estimate errors, sequential scans behind selective predicates, nested loops over large inputs, sort and hash spills, and missing-index candidates, each with an explanation pointing at the plan node
-- [ ] **Initial rewrite rules:** deterministic rewrites such as making predicates index-friendly (sargable) and decorrelating subqueries, plus index recommendations
+- [ ] **Target connection management:** register several target databases at runtime, with credentials stored encrypted
+- [ ] **More detectors:** missing join indexes, nested loops over large inputs, index scans with heavy rechecks, CTE and subquery fences
+- [ ] **Initial rewrite rules:** deterministic rewrites such as making predicates index-friendly (sargable) and decorrelating subqueries
 - [ ] **Benchmarking harness:** warm-up runs, repeated measurement, median and spread reporting, recorded environment, and result-set comparison between original and rewrite
-- [ ] **Reference dataset:** a reproducible synthetic schema and data generator for development and tests
-- [ ] **Web:** SQL input, plan tree view, findings list, benchmark comparison
+- [ ] **Web:** analysis history and benchmark comparison
 
 **Exit criteria:** on the reference dataset, QueryForge accepts a query, shows its plan, flags at least the bottleneck types above with correct node references, and benchmarks rule-based rewrites against the original. All behavior is covered by integration tests against real PostgreSQL.
 

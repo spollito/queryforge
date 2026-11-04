@@ -14,8 +14,8 @@ const steps: PlanStep[] = [
   { operation: 'Rank Candidates', detail: 'phase=3 model=xgboost', status: 'planned' },
   { operation: 'Verify Equivalence', detail: 'phase=2 solver=z3', status: 'planned' },
   { operation: 'Generate Rewrites', detail: 'phase=1..2 via=rules,llm', status: 'next' },
-  { operation: 'Detect Bottlenecks', detail: 'phase=1', status: 'next' },
-  { operation: 'Analyze Plan', detail: 'phase=1 parser=calcite', status: 'next' },
+  { operation: 'Detect Bottlenecks', detail: 'phase=1', status: 'done' },
+  { operation: 'Analyze Plan', detail: 'phase=1 parser=calcite', status: 'done' },
   { operation: 'Seq Scan on foundation', detail: 'phase=0', status: 'done' },
 ]
 
