@@ -25,10 +25,10 @@ tested code and keeps the Phase-1 baseline green before the next begins.
 - [x] `LlmClient` interface + deterministic `MockLlmClient` (D-B); provider adapter disabled unless key set — `llm/`
 - [x] Structured-output validation: parse/validate LLM response → `list[CandidateRewrite]`; reject malformed/unsupported — `llm/structured.py`
 - [x] Versioned prompt templates (`prompt_version` recorded per run) — `prompts/`
-- [ ] Retrieval: local rule/example corpus with stable ids (`RULE-*`); lexical (BM25/TF-IDF) retriever
-- [ ] Structured schema retrieval via Java API (tables/columns/types/PK-FK/indexes/stats)
-- [ ] Treat retrieved text + metadata as untrusted data, never instructions
-- [ ] Unit tests: retrieval relevance, structured-output validation, rule-id citation
+- [x] Retrieval: local rule/example corpus with stable ids (`RULE-*`); dependency-free TF-IDF retriever — `retrieval/rules.py`, `retrieval/index.py`
+- [~] Structured schema retrieval: Python side done (`retrieval/schema.py`: typed `SchemaContext`, static + HTTP providers); **Java `/api/v1/schema` endpoint pending Phase 3**
+- [x] Treat retrieved text + metadata as untrusted data, never instructions — prompt + `retrieval/__init__.py`
+- [x] Unit tests: retrieval relevance, structured-output validation, rule-id citation grounding — `tests/test_index.py`, `test_retrieval_context.py`, `test_schema.py`
 - [ ] Evaluate retrieval-enabled vs. non-retrieval rewriting (harness hook; real numbers later)
 
 ## Phase 3 — LangGraph orchestration + bounded retries
