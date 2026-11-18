@@ -39,3 +39,17 @@ class UnknownVerifier(Verifier):
             method="none",
             detail="No verifier configured; equivalence is undecided.",
         )
+
+
+def default_verifier() -> Verifier:
+    """Return the Z3 verifier when the 'verification' extra is installed, else the safe default.
+
+    Falling back to :class:`UnknownVerifier` keeps the service working (every non-identity
+    candidate is treated as not verified) when z3/sqlglot are unavailable.
+    """
+    try:
+        from .z3_verifier import Z3Verifier
+
+        return Z3Verifier()
+    except Exception:
+        return UnknownVerifier()

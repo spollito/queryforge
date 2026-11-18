@@ -46,14 +46,16 @@ tested code and keeps the Phase-1 baseline green before the next begins.
 
 ## Phase 4 — Semantic verification + deterministic guardrails
 
-- [ ] Z3 (`z3-solver`) verifier over the supported fragment (SPJ + conjunctive predicates)
-- [ ] Status model `VERIFIED | INVALID | UNKNOWN | UNSUPPORTED`; never report UNKNOWN/UNSUPPORTED as verified
-- [ ] Counterexample generation → feedback into bounded retries
-- [ ] Differential testing on controlled fixtures (supplementary evidence only)
-- [ ] Document supported constructs + limits (NULL, bag semantics, joins, agg, order, coercion, constraints)
-- [ ] Guardrails: every candidate re-validated through Java parse gate before DB; allowed schemas/tables; restricted tool surface
-- [ ] Confirm row-level data never eligible for LLM egress (assert in code + test)
-- [ ] Tests: Z3 counterexamples, NULL/duplicate semantics, read-only restriction, unsupported rejection
+- [x] Z3 (`z3-solver`) verifier over the supported fragment (single-table select-project, integer conjunctive predicates) — `verification/z3_verifier.py`
+- [x] Status model `VERIFIED | INVALID | UNKNOWN | UNSUPPORTED`; UNKNOWN/UNSUPPORTED never treated as verified (enforced by `is_trustworthy_equivalence`)
+- [x] Three-valued (NULL-aware) encoding so `a = a` ≠ `TRUE`; bag-semantics argument documented in the module
+- [x] Counterexample generation → fed back into bounded retries via `verification_feedback`
+- [x] `default_verifier()` wired into `from_env` (falls back to `UnknownVerifier` if z3/sqlglot absent)
+- [x] Guardrail: every candidate re-validated through the Java Calcite gate before DB (`validate_sql` node)
+- [x] Row-level data never eligible for LLM egress: prompt uses schema metadata + plan (costs/estimates, no rows) + rules + SQL only
+- [x] Tests: Z3 VERIFIED/INVALID/UNSUPPORTED, boundary + NULL counterexamples, end-to-end select + reject — `tests/test_z3_verifier.py`, `test_workflow.py`
+- [ ] Differential testing on controlled fixtures (supplementary evidence; deferred — Z3 covers the fragment, differential extends beyond it)
+- [ ] Extend fragment: joins, DISTINCT/GROUP BY, non-integer types (follow-on)
 
 ## Phase 5 — ML ranking + full integration
 

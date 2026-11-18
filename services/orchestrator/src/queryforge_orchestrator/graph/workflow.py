@@ -33,13 +33,13 @@ from ..integration.fakes import FakeJavaApiClient
 from ..integration.java_client import HttpJavaApiClient, JavaApiClient, JavaApiError
 from ..llm.client import LlmClient, default_client
 from ..llm.structured import StructuredOutputError, looks_read_only, parse_candidates
-from ..models import ExplainMode, GraphState, OptimizationRequest
+from ..models import ExplainMode, GraphState, OptimizationRequest, VerificationStatus
 from ..prompts import ACTIVE_REWRITE_PROMPT
 from ..ranking import PlannerCostRanker, Ranker
 from ..retrieval.context import build_rules_block_from_ids, retrieve_rules
 from ..retrieval.index import RetrievedReference
 from ..retrieval.schema import HttpSchemaProvider, SchemaProvider, StaticSchemaProvider
-from ..verification import UnknownVerifier, Verifier
+from ..verification import Verifier, default_verifier
 
 RetrieveFn = Callable[[str, int], list[RetrievedReference]]
 
@@ -70,7 +70,7 @@ class OptimizerDeps:
             llm=default_client(),
             java_client=java_client,
             schema_provider=schema_provider,
-            verifier=UnknownVerifier(),
+            verifier=default_verifier(),
             ranker=PlannerCostRanker(),
             retrieve_fn=retrieve_rules,
             retrieval_k=3,
@@ -128,6 +128,11 @@ def build_graph(deps: OptimizerDeps):
             plan=plan_text,
             rules=build_rules_block_from_ids(state.retrieved_refs),
         )
+        if state.verification_feedback:
+            # Counterexample feedback from a previous attempt (SPEC.md §7): rows where a
+            # rejected candidate disagreed with the original. Treated as data, not instructions.
+            prompt += "\n\nPREVIOUS CANDIDATES WERE REJECTED. Avoid rewrites that differ on:\n"
+            prompt += "\n".join(f"- {item}" for item in state.verification_feedback)
         raw = deps.llm.complete(prompt)
         base = {
             "llm_calls": state.llm_calls + 1,
@@ -164,7 +169,13 @@ def build_graph(deps: OptimizerDeps):
             deps.verifier.verify(state.original_sql, candidate.sql)
             for candidate in state.candidates
         ]
-        return {"verification_results": results}
+        # Collect counterexamples from rejected candidates as feedback for a possible retry.
+        feedback = [
+            f"{candidate.sql} -> counterexample row {result.counterexample}"
+            for candidate, result in zip(state.candidates, results)
+            if result.status is VerificationStatus.INVALID and result.counterexample is not None
+        ]
+        return {"verification_results": results, "verification_feedback": feedback}
 
     def bump_retry(state: GraphState) -> dict:
         return {"retry_count": state.retry_count + 1}

@@ -152,6 +152,7 @@ class GraphState(BaseModel):
     candidates: list[CandidateRewrite] = Field(default_factory=list)
     candidate_plans: list[dict] = Field(default_factory=list)
     verification_results: list[VerificationResult] = Field(default_factory=list)
+    verification_feedback: list[str] = Field(default_factory=list)
     ranking_predictions: list[RankingPrediction] = Field(default_factory=list)
 
     # Control + bookkeeping

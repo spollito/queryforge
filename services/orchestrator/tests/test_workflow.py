@@ -154,3 +154,32 @@ def test_retry_then_success():
     assert state.result_sql == good
     assert state.llm_calls == 2
     assert state.retry_count == 1
+
+
+# --- end-to-end with the real Z3 verifier --------------------------------------------------
+
+
+def test_z3_selects_a_truly_equivalent_rewrite():
+    from queryforge_orchestrator.verification.z3_verifier import Z3Verifier
+
+    equivalent = "SELECT id FROM orders WHERE 42 = customer_id"
+    llm = ScriptedLlmClient([json.dumps([_candidate_json(equivalent)])])
+    state = run_optimization(OptimizationRequest(sql=ORIGINAL), _deps(llm, Z3Verifier()))
+
+    assert state.used_fallback is False
+    assert state.result_sql == equivalent
+    assert state.verification_results[0].status is VerificationStatus.VERIFIED
+
+
+def test_z3_rejects_non_equivalent_rewrite_records_feedback_and_falls_back():
+    from queryforge_orchestrator.verification.z3_verifier import Z3Verifier
+
+    not_equivalent = "SELECT id FROM orders WHERE customer_id >= 42"
+    llm = ScriptedLlmClient([json.dumps([_candidate_json(not_equivalent)])])
+    state = run_optimization(OptimizationRequest(sql=ORIGINAL), _deps(llm, Z3Verifier()))
+
+    assert state.used_fallback is True
+    assert state.result_sql == ORIGINAL
+    # A counterexample was captured and fed back for the bounded retries (SPEC §7).
+    assert state.verification_feedback
+    assert "counterexample row" in state.verification_feedback[0]

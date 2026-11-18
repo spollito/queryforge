@@ -6,12 +6,19 @@ XGBoost ranking. It **never** connects to a database directly: plan capture, EXP
 benchmark execution all go back through the Java API, which keeps the single read-only path
 to target databases.
 
-> **Status:** Phases 2–3. Implemented: typed models, the mock-first pluggable LLM client,
+> **Status:** Phases 2–4. Implemented: typed models, the mock-first pluggable LLM client,
 > structured-output validation, versioned prompts, retrieval (rule corpus + TF-IDF index +
-> schema context), and the **bounded LangGraph workflow** with retries, fallback, and a
-> `POST /optimize` endpoint. Verification (Z3) and ranking (XGBoost) land behind their
-> interfaces in Phases 4–5; the current defaults are a conservative `UnknownVerifier` and the
-> planner-cost ranker. See [../../TASKS.md](../../TASKS.md).
+> schema context), the **bounded LangGraph workflow** (retries, fallback, `POST /optimize`),
+> and **Z3 semantic verification** over a single-table select-project fragment with
+> three-valued (NULL-aware) logic, counterexamples, and retry feedback. Ranking (XGBoost)
+> lands behind its interface in Phase 5; the current ranker is the planner-cost baseline.
+> See [../../TASKS.md](../../TASKS.md).
+
+> **Install note (verification extra):** on a universal2 Python running under x86_64, pip may
+> fetch an arch-mismatched `z3-solver` wheel. If `import z3` fails with an architecture error,
+> reinstall the matching wheel, e.g. `pip install --force-reinstall --no-deps` a
+> `...macosx_*_x86_64.whl`. The service degrades gracefully to a no-op verifier if z3 is
+> unavailable.
 
 ## LLM is mock-first and off by default
 
@@ -56,7 +63,9 @@ src/queryforge_orchestrator/
   integration/
     java_client.py     JavaApiClient (HTTP) — the only path to the database
     fakes.py           FakeJavaApiClient for offline/tests
-  verification/__init__.py  Verifier interface + UnknownVerifier default (Z3 in Phase 4)
+  verification/
+    __init__.py        Verifier interface, UnknownVerifier, default_verifier()
+    z3_verifier.py     Z3 equivalence over a single-table select-project fragment (3VL)
   ranking/             Ranker interface + PlannerCostRanker baseline (XGBoost in Phase 5)
   graph/workflow.py    The bounded LangGraph StateGraph + run_optimization()
   app.py               FastAPI entry point (/health, /optimize)
