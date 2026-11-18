@@ -10,7 +10,7 @@ from __future__ import annotations
 
 from ..models import CandidateRewrite
 from .index import LexicalIndex, RetrievedReference
-from .rules import all_rule_ids
+from .rules import all_rule_ids, rule_by_id
 
 _SHARED_INDEX = LexicalIndex()
 
@@ -29,6 +29,16 @@ def build_rules_block(refs: list[RetrievedReference]) -> str:
     if not refs:
         return "(no optimization rules retrieved)"
     return "\n".join(f"[{ref.rule_id}] {ref.title}: {ref.text}" for ref in refs)
+
+
+def build_rules_block_from_ids(rule_ids: list[str]) -> str:
+    """Render a rules block from stable ids (used when only ids are carried in graph state)."""
+    refs = [
+        RetrievedReference(rule_id=rule.id, title=rule.title, text=rule.summary, score=0.0)
+        for rule_id in rule_ids
+        if (rule := rule_by_id(rule_id)) is not None
+    ]
+    return build_rules_block(refs)
 
 
 def ungrounded_rule_ids(candidate: CandidateRewrite, known_ids: frozenset[str] | None = None) -> list[str]:

@@ -33,13 +33,15 @@ tested code and keeps the Phase-1 baseline green before the next begins.
 
 ## Phase 3 — LangGraph orchestration + bounded retries
 
-- [ ] `GraphState` wired into a LangGraph `StateGraph` with the 10 nodes (SPEC §4)
-- [ ] Deterministic nodes call back to Java for parse / EXPLAIN (typed HTTP client)
-- [ ] Conditional edges: reject invalid, retry generation, fall back to original
-- [ ] Hard limits: `MAX_ITERATIONS`, `MAX_RETRIES`, per-node timeouts, LLM-call budget
-- [ ] `FastAPI` endpoint `POST /optimize`; Java `/api/v1/optimizations` proxy with timeout + fallback
-- [ ] Java↔Python typed request/response schemas; fallback to Phase-1 analysis if Python is down
-- [ ] Tests: graph transitions, retry limits, timeout handling, fallback behavior
+- [x] `GraphState` wired into a LangGraph `StateGraph` with the 10 nodes (SPEC §4) — `graph/workflow.py`
+- [x] Deterministic nodes call back to Java for parse / plan capture (typed `JavaApiClient`: HTTP + fake) — `integration/`
+- [x] Conditional edges: reject invalid, retry generation, fall back to original
+- [x] Hard limits: recursion limit, `MAX_RETRIES`, LLM-call budget, overall wall-clock deadline — `config.py` (per-node timeouts deferred)
+- [x] Verifier + Ranker interfaces with safe defaults (UnknownVerifier, PlannerCostRanker) so Phase 4/5 slot in — `verification/`, `ranking/`
+- [x] `FastAPI` endpoint `POST /optimize` — `app.py`
+- [~] Java `/api/v1/optimizations` proxy with timeout + fallback to Phase-1 analysis — **pending (Java side)**
+- [~] Java↔Python typed schemas: Python side done; Java client + `/api/v1/schema` endpoint **pending Phase 3 Java work**
+- [x] Tests: graph transitions, retry limits, fallback, candidate/original rejection, budget bounds — `tests/test_workflow.py`
 
 ## Phase 4 — Semantic verification + deterministic guardrails
 

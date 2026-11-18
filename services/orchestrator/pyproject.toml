@@ -34,3 +34,8 @@ where = ["src"]
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 pythonpath = ["src"]
+filterwarnings = [
+    # Third-party deprecation noise from langgraph/langchain and starlette's test client.
+    "ignore::DeprecationWarning",
+    "ignore::PendingDeprecationWarning",
+]
