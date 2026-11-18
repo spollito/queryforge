@@ -6,10 +6,19 @@ XGBoost ranking. It **never** connects to a database directly: plan capture, EXP
 benchmark execution all go back through the Java API, which keeps the single read-only path
 to target databases.
 
-> **Status:** Phase 2 foundation. Implemented so far: typed models, the mock-first pluggable
-> LLM client, structured-output validation, versioned prompts, and a FastAPI health endpoint.
-> The LangGraph workflow, retrieval, Z3, and ranking land in later phases (see
-> [../../TASKS.md](../../TASKS.md)).
+> **Status:** Phases 2–4. Implemented: typed models, the mock-first pluggable LLM client,
+> structured-output validation, versioned prompts, retrieval (rule corpus + TF-IDF index +
+> schema context), the **bounded LangGraph workflow** (retries, fallback, `POST /optimize`),
+> and **Z3 semantic verification** over a single-table select-project fragment with
+> three-valued (NULL-aware) logic, counterexamples, and retry feedback. Ranking (XGBoost)
+> lands behind its interface in Phase 5; the current ranker is the planner-cost baseline.
+> See [../../TASKS.md](../../TASKS.md).
+
+> **Install note (verification extra):** on a universal2 Python running under x86_64, pip may
+> fetch an arch-mismatched `z3-solver` wheel. If `import z3` fails with an architecture error,
+> reinstall the matching wheel, e.g. `pip install --force-reinstall --no-deps` a
+> `...macosx_*_x86_64.whl`. The service degrades gracefully to a no-op verifier if z3 is
+> unavailable.
 
 ## LLM is mock-first and off by default
 
@@ -40,11 +49,39 @@ uvicorn queryforge_orchestrator.app:app --reload   # run the service (health onl
 ```text
 src/queryforge_orchestrator/
   models.py            Pydantic GraphState, CandidateRewrite, VerificationResult, enums
+  config.py            OptimizerLimits (retries, LLM budget, deadline, recursion limit)
   llm/
     client.py          LlmClient interface, MockLlmClient, default_client()
     anthropic_client.py  Real provider adapter (lazy; off unless configured)
     structured.py      Validate raw LLM output into typed candidates
   prompts/__init__.py  Versioned prompt templates
-  app.py               FastAPI entry point
-tests/                 pytest suite (mock LLM, deterministic)
+  retrieval/
+    rules.py           Optimization-rule corpus with stable RULE-* ids
+    index.py           Dependency-free TF-IDF lexical retriever
+    schema.py          Typed SchemaContext; static + HTTP schema providers
+    context.py         Prompt-context builder + rule-citation grounding check
+  integration/
+    java_client.py     JavaApiClient (HTTP) — the only path to the database
+    fakes.py           FakeJavaApiClient for offline/tests
+  verification/
+    __init__.py        Verifier interface, UnknownVerifier, default_verifier()
+    z3_verifier.py     Z3 equivalence over a single-table select-project fragment (3VL)
+  ranking/             Ranker interface + PlannerCostRanker baseline (XGBoost in Phase 5)
+  graph/workflow.py    The bounded LangGraph StateGraph + run_optimization()
+  app.py               FastAPI entry point (/health, /optimize)
+tests/                 pytest suite (mock LLM, deterministic) — 55 tests
 ```
+
+## Run the workflow offline
+
+```python
+from queryforge_orchestrator.graph import run_optimization
+from queryforge_orchestrator.models import OptimizationRequest
+
+state = run_optimization(OptimizationRequest(sql="SELECT id FROM orders WHERE customer_id = 42"))
+print(state.result_sql, state.used_fallback, state.trace_id)
+```
+
+With no `QUERYFORGE_JAVA_API_URL` set, a fake Java client is used so the graph runs without a
+database. Point it at a running Java API (`export QUERYFORGE_JAVA_API_URL=http://localhost:8080`)
+to validate candidates and capture real plans.

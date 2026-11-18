@@ -21,6 +21,10 @@ import org.springframework.web.servlet.mvc.method.annotation.ResponseEntityExcep
  * Maps failures to RFC 9457 problem details. Each problem carries a stable
  * {@code code} property for clients; the inherited handlers cover request
  * validation (400) and other framework errors.
+ *
+ * <p>These handlers also cover {@code /api/v1/schema} and {@code /api/v1/optimizations},
+ * which reach the target database (and, on fallback, the analysis pipeline) through the
+ * same {@code TargetDatabase} and parser as {@code /api/v1/analyses}.
  */
 @RestControllerAdvice
 class ApiExceptionHandler extends ResponseEntityExceptionHandler {

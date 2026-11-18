@@ -94,6 +94,42 @@ class OptimizationRequest(BaseModel):
     max_candidates: int = Field(default=3, ge=1, le=10)
 
 
+class OptimizationResponse(BaseModel):
+    """Public output of the orchestrator (a trimmed view of the final graph state)."""
+
+    model_config = {"extra": "forbid"}
+
+    trace_id: str | None
+    result_sql: str | None
+    used_fallback: bool
+    candidates: list["CandidateRewrite"]
+    verification_results: list["VerificationResult"]
+    ranking_predictions: list["RankingPrediction"]
+    retrieved_refs: list[str]
+    prompt_version: str | None
+    retry_count: int
+    llm_calls: int
+    timings_ms: dict[str, float]
+    errors: list[str]
+
+    @classmethod
+    def from_state(cls, state: "GraphState") -> "OptimizationResponse":
+        return cls(
+            trace_id=state.trace_id,
+            result_sql=state.result_sql,
+            used_fallback=state.used_fallback,
+            candidates=state.candidates,
+            verification_results=state.verification_results,
+            ranking_predictions=state.ranking_predictions,
+            retrieved_refs=state.retrieved_refs,
+            prompt_version=state.prompt_version,
+            retry_count=state.retry_count,
+            llm_calls=state.llm_calls,
+            timings_ms=state.timings_ms,
+            errors=state.errors,
+        )
+
+
 class GraphState(BaseModel):
     """Typed state threaded through the LangGraph workflow (SPEC.md §4).
 
@@ -116,10 +152,13 @@ class GraphState(BaseModel):
     candidates: list[CandidateRewrite] = Field(default_factory=list)
     candidate_plans: list[dict] = Field(default_factory=list)
     verification_results: list[VerificationResult] = Field(default_factory=list)
+    verification_feedback: list[str] = Field(default_factory=list)
     ranking_predictions: list[RankingPrediction] = Field(default_factory=list)
 
     # Control + bookkeeping
     retry_count: int = 0
+    llm_calls: int = 0
+    prompt_version: str | None = None
     timings_ms: dict[str, float] = Field(default_factory=dict)
     trace_id: str | None = None
 

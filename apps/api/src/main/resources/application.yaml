@@ -31,6 +31,14 @@ queryforge:
     statement-timeout: ${TARGET_DB_STATEMENT_TIMEOUT:10s}
     # Session time zone for analysis, so timestamp literals mean the same thing wherever the API runs.
     time-zone: ${TARGET_DB_TIME_ZONE:UTC}
+  # The Python agentic orchestrator. When disabled or unreachable, /api/v1/optimizations
+  # falls back to the Phase-1 analysis, so the endpoint works before the service is deployed.
+  orchestrator:
+    url: ${QUERYFORGE_ORCHESTRATOR_URL:http://localhost:8000}
+    timeout: ${QUERYFORGE_ORCHESTRATOR_TIMEOUT:30s}
+    connect-timeout: ${QUERYFORGE_ORCHESTRATOR_CONNECT_TIMEOUT:5s}
+    enabled: ${QUERYFORGE_ORCHESTRATOR_ENABLED:true}
+    max-candidates: ${QUERYFORGE_ORCHESTRATOR_MAX_CANDIDATES:3}
 
 management:
   endpoints:

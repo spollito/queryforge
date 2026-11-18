@@ -25,32 +25,37 @@ tested code and keeps the Phase-1 baseline green before the next begins.
 - [x] `LlmClient` interface + deterministic `MockLlmClient` (D-B); provider adapter disabled unless key set — `llm/`
 - [x] Structured-output validation: parse/validate LLM response → `list[CandidateRewrite]`; reject malformed/unsupported — `llm/structured.py`
 - [x] Versioned prompt templates (`prompt_version` recorded per run) — `prompts/`
-- [ ] Retrieval: local rule/example corpus with stable ids (`RULE-*`); lexical (BM25/TF-IDF) retriever
-- [ ] Structured schema retrieval via Java API (tables/columns/types/PK-FK/indexes/stats)
-- [ ] Treat retrieved text + metadata as untrusted data, never instructions
-- [ ] Unit tests: retrieval relevance, structured-output validation, rule-id citation
+- [x] Retrieval: local rule/example corpus with stable ids (`RULE-*`); dependency-free TF-IDF retriever — `retrieval/rules.py`, `retrieval/index.py`
+- [~] Structured schema retrieval: Python side done (`retrieval/schema.py`: typed `SchemaContext`, static + HTTP providers); **Java `/api/v1/schema` endpoint pending Phase 3**
+- [x] Treat retrieved text + metadata as untrusted data, never instructions — prompt + `retrieval/__init__.py`
+- [x] Unit tests: retrieval relevance, structured-output validation, rule-id citation grounding — `tests/test_index.py`, `test_retrieval_context.py`, `test_schema.py`
 - [ ] Evaluate retrieval-enabled vs. non-retrieval rewriting (harness hook; real numbers later)
 
 ## Phase 3 — LangGraph orchestration + bounded retries
 
-- [ ] `GraphState` wired into a LangGraph `StateGraph` with the 10 nodes (SPEC §4)
-- [ ] Deterministic nodes call back to Java for parse / EXPLAIN (typed HTTP client)
-- [ ] Conditional edges: reject invalid, retry generation, fall back to original
-- [ ] Hard limits: `MAX_ITERATIONS`, `MAX_RETRIES`, per-node timeouts, LLM-call budget
-- [ ] `FastAPI` endpoint `POST /optimize`; Java `/api/v1/optimizations` proxy with timeout + fallback
-- [ ] Java↔Python typed request/response schemas; fallback to Phase-1 analysis if Python is down
-- [ ] Tests: graph transitions, retry limits, timeout handling, fallback behavior
+- [x] `GraphState` wired into a LangGraph `StateGraph` with the 10 nodes (SPEC §4) — `graph/workflow.py`
+- [x] Deterministic nodes call back to Java for parse / plan capture (typed `JavaApiClient`: HTTP + fake) — `integration/`
+- [x] Conditional edges: reject invalid, retry generation, fall back to original
+- [x] Hard limits: recursion limit, `MAX_RETRIES`, LLM-call budget, overall wall-clock deadline — `config.py` (per-node timeouts deferred)
+- [x] Verifier + Ranker interfaces with safe defaults (UnknownVerifier, PlannerCostRanker) so Phase 4/5 slot in — `verification/`, `ranking/`
+- [x] `FastAPI` endpoint `POST /optimize` — `app.py`
+- [x] Java `/api/v1/optimizations` proxy (RestClient, timeout, fallback to Phase-1 analysis) — `api/.../optimization/`
+- [x] Java `/api/v1/schema` endpoint (catalog metadata: columns, PK/FK, indexes, reltuples) — `api/.../schema/`
+- [x] Java↔Python typed schemas; Python `HttpJavaApiClient` + `HttpSchemaProvider` wired via `QUERYFORGE_JAVA_API_URL`
+- [x] Tests: graph transitions, retry limits, fallback, candidate/original rejection, budget bounds — `tests/test_workflow.py`; Java `SchemaApiTests`, `OptimizationApiTests`
 
 ## Phase 4 — Semantic verification + deterministic guardrails
 
-- [ ] Z3 (`z3-solver`) verifier over the supported fragment (SPJ + conjunctive predicates)
-- [ ] Status model `VERIFIED | INVALID | UNKNOWN | UNSUPPORTED`; never report UNKNOWN/UNSUPPORTED as verified
-- [ ] Counterexample generation → feedback into bounded retries
-- [ ] Differential testing on controlled fixtures (supplementary evidence only)
-- [ ] Document supported constructs + limits (NULL, bag semantics, joins, agg, order, coercion, constraints)
-- [ ] Guardrails: every candidate re-validated through Java parse gate before DB; allowed schemas/tables; restricted tool surface
-- [ ] Confirm row-level data never eligible for LLM egress (assert in code + test)
-- [ ] Tests: Z3 counterexamples, NULL/duplicate semantics, read-only restriction, unsupported rejection
+- [x] Z3 (`z3-solver`) verifier over the supported fragment (single-table select-project, integer conjunctive predicates) — `verification/z3_verifier.py`
+- [x] Status model `VERIFIED | INVALID | UNKNOWN | UNSUPPORTED`; UNKNOWN/UNSUPPORTED never treated as verified (enforced by `is_trustworthy_equivalence`)
+- [x] Three-valued (NULL-aware) encoding so `a = a` ≠ `TRUE`; bag-semantics argument documented in the module
+- [x] Counterexample generation → fed back into bounded retries via `verification_feedback`
+- [x] `default_verifier()` wired into `from_env` (falls back to `UnknownVerifier` if z3/sqlglot absent)
+- [x] Guardrail: every candidate re-validated through the Java Calcite gate before DB (`validate_sql` node)
+- [x] Row-level data never eligible for LLM egress: prompt uses schema metadata + plan (costs/estimates, no rows) + rules + SQL only
+- [x] Tests: Z3 VERIFIED/INVALID/UNSUPPORTED, boundary + NULL counterexamples, end-to-end select + reject — `tests/test_z3_verifier.py`, `test_workflow.py`
+- [ ] Differential testing on controlled fixtures (supplementary evidence; deferred — Z3 covers the fragment, differential extends beyond it)
+- [ ] Extend fragment: joins, DISTINCT/GROUP BY, non-integer types (follow-on)
 
 ## Phase 5 — ML ranking + full integration
 
