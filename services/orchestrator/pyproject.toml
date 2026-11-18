@@ -1,0 +1,36 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "queryforge-orchestrator"
+version = "0.1.0"
+description = "QueryForge agentic SQL-optimization orchestrator (LangGraph + retrieval + verification + ranking)"
+readme = "README.md"
+requires-python = ">=3.10"
+license = "MIT"
+dependencies = [
+    "pydantic>=2.5,<3",
+    "fastapi>=0.110,<1",
+    "uvicorn>=0.29,<1",
+]
+
+# Heavier phase-specific deps are declared as extras so the base install stays light and the
+# Phase-1 baseline is unaffected. They are wired in when their phase lands (see TASKS.md).
+[project.optional-dependencies]
+retrieval = ["rank-bm25>=0.2.2,<0.3"]
+verification = ["z3-solver>=4.13,<5"]
+ranking = ["xgboost>=2.0,<3", "scikit-learn>=1.4,<2", "numpy>=1.26,<3"]
+orchestration = ["langgraph>=0.2,<0.3"]
+llm-anthropic = ["anthropic>=0.39,<1"]
+dev = [
+    "pytest>=8.0,<9",
+    "httpx>=0.27,<1",
+]
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["src"]

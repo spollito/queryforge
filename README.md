@@ -79,8 +79,11 @@ queryforge/
 ├── apps/
 │   ├── api/            Spring Boot API (Maven)
 │   └── web/            React + TypeScript web client (Vite)
+├── services/
+│   └── orchestrator/   Python agentic orchestrator (FastAPI, LangGraph) — in progress
 ├── docs/
 │   ├── architecture.md System design and architectural decisions
+│   ├── baseline.md     Preserved Phase-1 build/test baseline
 │   └── roadmap.md      Phased development plan
 ├── infrastructure/
 │   └── sample-db/      Schema, data generator, and read-only role for the sample target
@@ -89,7 +92,7 @@ queryforge/
 └── .env.example        Template for local configuration
 ```
 
-`services/` (Python ML service) will be added in the phase that needs it.
+The agentic enhancement is specified in [SPEC.md](SPEC.md) and tracked in [TASKS.md](TASKS.md). The Python orchestrator under `services/orchestrator/` is being built per that spec; see its [README](services/orchestrator/README.md).
 
 ## Local development
 
