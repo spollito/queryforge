@@ -39,9 +39,10 @@ tested code and keeps the Phase-1 baseline green before the next begins.
 - [x] Hard limits: recursion limit, `MAX_RETRIES`, LLM-call budget, overall wall-clock deadline — `config.py` (per-node timeouts deferred)
 - [x] Verifier + Ranker interfaces with safe defaults (UnknownVerifier, PlannerCostRanker) so Phase 4/5 slot in — `verification/`, `ranking/`
 - [x] `FastAPI` endpoint `POST /optimize` — `app.py`
-- [~] Java `/api/v1/optimizations` proxy with timeout + fallback to Phase-1 analysis — **pending (Java side)**
-- [~] Java↔Python typed schemas: Python side done; Java client + `/api/v1/schema` endpoint **pending Phase 3 Java work**
-- [x] Tests: graph transitions, retry limits, fallback, candidate/original rejection, budget bounds — `tests/test_workflow.py`
+- [x] Java `/api/v1/optimizations` proxy (RestClient, timeout, fallback to Phase-1 analysis) — `api/.../optimization/`
+- [x] Java `/api/v1/schema` endpoint (catalog metadata: columns, PK/FK, indexes, reltuples) — `api/.../schema/`
+- [x] Java↔Python typed schemas; Python `HttpJavaApiClient` + `HttpSchemaProvider` wired via `QUERYFORGE_JAVA_API_URL`
+- [x] Tests: graph transitions, retry limits, fallback, candidate/original rejection, budget bounds — `tests/test_workflow.py`; Java `SchemaApiTests`, `OptimizationApiTests`
 
 ## Phase 4 — Semantic verification + deterministic guardrails
 

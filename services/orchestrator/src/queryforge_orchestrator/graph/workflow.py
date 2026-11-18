@@ -38,7 +38,7 @@ from ..prompts import ACTIVE_REWRITE_PROMPT
 from ..ranking import PlannerCostRanker, Ranker
 from ..retrieval.context import build_rules_block_from_ids, retrieve_rules
 from ..retrieval.index import RetrievedReference
-from ..retrieval.schema import SchemaProvider, StaticSchemaProvider
+from ..retrieval.schema import HttpSchemaProvider, SchemaProvider, StaticSchemaProvider
 from ..verification import UnknownVerifier, Verifier
 
 RetrieveFn = Callable[[str, int], list[RetrievedReference]]
@@ -63,10 +63,13 @@ class OptimizerDeps:
         java_client: JavaApiClient = (
             HttpJavaApiClient(java_url) if java_url else FakeJavaApiClient()
         )
+        schema_provider: SchemaProvider = (
+            HttpSchemaProvider(java_url) if java_url else StaticSchemaProvider()
+        )
         return cls(
             llm=default_client(),
             java_client=java_client,
-            schema_provider=StaticSchemaProvider(),
+            schema_provider=schema_provider,
             verifier=UnknownVerifier(),
             ranker=PlannerCostRanker(),
             retrieve_fn=retrieve_rules,
